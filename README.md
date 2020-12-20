@@ -24,4 +24,9 @@ python3 tools/train.py model/cascade.py
 
 # multi-gpu testing  
 ./tools/dist_train.sh model/cascade.py  ${GPU_NUM}  
-```  
+```    
+
+# Inference  
+```bash
+python3 predict.py dataset/test/imgs
+```
