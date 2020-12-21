@@ -27,6 +27,8 @@ $ python3 change_jsonstyle/trash2coco.py
 ```  
 
 ## Training    
+**\*Important\***: According to the [Linear Scaling Rule](https://arxiv.org/abs/1706.02677), you need to set the learning rate proportional to the batch size if you use different GPUs or images per GPU, e.g., lr=0.01 for 4 GPUs * 2 img/gpu and lr=0.08 for 16 GPUs * 4 img/gpu.  
+
 ```bash
 # single-gpu training
 $ python3 tools/train.py model/cascade.py   
