@@ -231,7 +231,7 @@ def geojson2coco(imageroot: str, geojsonpath: str, destfile, difficult='-1'):
 
 if __name__ == '__main__':
 
-    rootfolder = 'dataset/trash/'
+    rootfolder = 'dataset/'
 
     geojson2coco(imageroot=os.path.join(rootfolder, 'train/imgs'),
                  geojsonpath=os.path.join(rootfolder, 'train/json'),
