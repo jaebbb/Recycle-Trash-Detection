@@ -1,5 +1,5 @@
 dataset_type = 'CocoDataset'
-data_root = 'dataset/trash/'
+data_root = 'dataset/'
 CLASSES = ('c_1', 'c_2', 'c_3', 'c_4', 'c_5', 'c_6', 'c_7')
 
 

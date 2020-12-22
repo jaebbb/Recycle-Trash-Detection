@@ -22,7 +22,10 @@ $ pip install -r requirements.txt
 $ pip install mmpycocotools
 $ pip install mmcv-full==1.1.6+torch1.5.0+cu102 -f https://openmmlab.oss-accelerate.aliyuncs.com/mmcv/dist/index.html --use-deprecated=legacy-resolver
 $ pip install -v -e .
-```
+```  
+### Preparing dataset  
+- You can prepare datasets in [here](dataset/README.md)  
+
 ### Change json format to coco style
 - You can refer to the sample images and jsons' format in the dataset folder.  
 ```bash
