@@ -31,22 +31,25 @@ $ python3 change_jsonstyle/trash2coco.py
 
 ```bash
 # single-gpu training
-$ python3 tools/train.py model/cascade.py   
+$ python3 tools/train.py ${MODEL_FILE}   
 
-# multi-gpu testing  
-$ ./tools/dist_train.sh model/cascade.py  ${GPU_NUM}  
+# multi-gpu training  
+$ ./tools/dist_train.sh ${MODEL_FILE}  ${GPU_NUM}  
 ```    
+e.g. `python3 tools/train.py model/cascade.py`
 
 ## Inference  
-You will get json files `xxxx.json` to be submit to the official evaluation server.
-```bash
-$ python3 predict.py {CHECKPOINT} {IMAGES_PATH}
-```  
+You will get json files `xxxx.json` to be submit to the official evaluation server.  
 You can use the following commands to get result images.  
 Detection results will be plotted on the images and saved to the specified directory.  
 ```bash
-$ python3 ....
+# single-gpu testing
+$ python3 predict.py ${MODEL_FILE} ${WEIGHT_FILE} ${RESULT_FOLDER}
+# multi-gpu testing
+$ ./tools/dist_test.sh ${MODEL_FILE} ${WEIGHT_FILE} ${RESULT_FOLDER} ${GPU_NUM}
+
 ```
+e.g. `python3 tools/test.py model/cascade.py work_dirs/cascade/latest.pth ./result`
 
 ## Another option : Docker  
 We provide a Dockerfile to build an image.  

@@ -1,123 +1,50 @@
+
 import argparse
 import os
-import warnings
+
+import json
+# import natsort
+from glob import glob
+from tqdm import tqdm
+import cv2
+import numpy as np
+from collections import OrderedDict
 
 import mmcv
 import torch
-from mmcv import Config, DictAction
-from mmcv.cnn import fuse_conv_bn
-from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
-from mmcv.runner import get_dist_info, init_dist, load_checkpoint
+from mmcv import Config
+from mmcv.parallel import MMDataParallel
+from mmcv.runner import get_dist_info, load_checkpoint
 
-from mmdet.apis import multi_gpu_test, single_gpu_test
+from mmdet.apis import single_gpu_test
 from mmdet.core import wrap_fp16_model
 from mmdet.datasets import (build_dataloader, build_dataset,
                             replace_ImageToTensor)
 from mmdet.models import build_detector
-import json
-from mmdet.core.post_processing import bbox_nms
-import numpy as np
+
 
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description='MMDet test (and eval) a model')
-    parser.add_argument('config', help='test config file path')
-    parser.add_argument('checkpoint', help='checkpoint file')
-    parser.add_argument('--out', help='output result file in pickle format')
-    parser.add_argument(
-        '--fuse-conv-bn',
-        action='store_true',
-        help='Whether to fuse conv and bn, this will slightly increase'
-        'the inference speed')
-    parser.add_argument(
-        '--format-only',
-        action='store_true',
-        help='Format the output results without perform evaluation. It is'
-        'useful when you want to format the result to a specific format and '
-        'submit it to the test server')
-    parser.add_argument(
-        '--eval',
-        type=str,
-        nargs='+',
-        help='evaluation metrics, which depends on the dataset, e.g., "bbox",'
-        ' "segm", "proposal" for COCO, and "mAP", "recall" for PASCAL VOC')
-    parser.add_argument('--show', action='store_true', help='show results')
-    parser.add_argument(
-        '--show-dir', help='directory where painted images will be saved')
-    parser.add_argument(
-        '--show-score-thr',
-        type=float,
-        default=0.53,
-        help='score threshold (default: 0.3)')
-    parser.add_argument(
-        '--gpu-collect',
-        action='store_true',
-        help='whether to use gpu to collect results.')
-    parser.add_argument(
-        '--tmpdir',
-        help='tmp directory used for collecting results from multiple '
-        'workers, available when gpu-collect is not specified')
-    parser.add_argument(
-        '--cfg-options',
-        nargs='+',
-        action=DictAction,
-        help='override some settings in the used config, the key-value pair '
-        'in xxx=yyy format will be merged into config file.')
-    parser.add_argument(
-        '--options',
-        nargs='+',
-        action=DictAction,
-        help='custom options for evaluation, the key-value pair in xxx=yyy '
-        'format will be kwargs for dataset.evaluate() function (deprecate), '
-        'change to --eval-options instead.')
-    parser.add_argument(
-        '--eval-options',
-        nargs='+',
-        action=DictAction,
-        help='custom options for evaluation, the key-value pair in xxx=yyy '
-        'format will be kwargs for dataset.evaluate() function')
-    parser.add_argument(
-        '--launcher',
-        choices=['none', 'pytorch', 'slurm', 'mpi'],
-        default='none',
-        help='job launcher')
-    parser.add_argument('--local_rank', type=int, default=0)
+    parser = argparse.ArgumentParser(description='MMDet test (and eval) a model')
+    parser.add_argument('model', default='./work_dirs/cascade/cascade.py')
+    parser.add_argument('weight', default='work_dirs/cascade/latest.pth')
+    parser.add_argument('show-dir', help='directory where painted images will be saved')
     args = parser.parse_args()
     if 'LOCAL_RANK' not in os.environ:
-        os.environ['LOCAL_RANK'] = str(args.local_rank)
-
-    if args.options and args.eval_options:
-        raise ValueError(
-            '--options and --eval-options cannot be both '
-            'specified, --options is deprecated in favor of --eval-options')
-    if args.options:
-        warnings.warn('--options is deprecated in favor of --eval-options')
-        args.eval_options = args.options
+        os.environ['LOCAL_RANK'] = str(0)
+        
     return args
 
 
 def main():
-    args = parse_args()
-
-    assert args.out or args.eval or args.format_only or args.show \
-        or args.show_dir, \
-        ('Please specify at least one operation (save/eval/format/show the '
-         'results / save the results) with the argument "--out", "--eval"'
-         ', "--format-only", "--show" or "--show-dir"')
-
-    if args.eval and args.format_only:
-        raise ValueError('--eval and --format_only cannot be both specified')
-
-    if args.out is not None and not args.out.endswith(('.pkl', '.pickle')):
-        raise ValueError('The output file must be a pkl file.')
-
-    cfg = Config.fromfile(args.config)
-    if args.cfg_options is not None:
-        cfg.merge_from_dict(args.cfg_options)
+    args = parse_args()  
+    # load model.py
+    cfg = Config.fromfile(args.model)
+      
     # import modules from string list.
     if cfg.get('custom_imports', None):
         from mmcv.utils import import_modules_from_strings
         import_modules_from_strings(**cfg['custom_imports'])
+
     # set cudnn_benchmark
     if cfg.get('cudnn_benchmark', False):
         torch.backends.cudnn.benchmark = True
@@ -139,13 +66,6 @@ def main():
         for ds_cfg in cfg.data.test:
             ds_cfg.test_mode = True
 
-    # init distributed env first, since logger depends on the dist info.
-    if args.launcher == 'none':
-        distributed = False
-    else:
-        distributed = True
-        init_dist(args.launcher, **cfg.dist_params)
-
     # build the dataloader
     samples_per_gpu = cfg.data.test.pop('samples_per_gpu', 1)
     if samples_per_gpu > 1:
@@ -156,109 +76,79 @@ def main():
         dataset,
         samples_per_gpu=samples_per_gpu,
         workers_per_gpu=cfg.data.workers_per_gpu,
-        dist=distributed,
-        shuffle=False)
-    
+        dist=False,
+        shuffle=False) 
+
     # build the model and load checkpoint
     model = build_detector(cfg.model, train_cfg=None, test_cfg=cfg.test_cfg)
     fp16_cfg = cfg.get('fp16', None)
     if fp16_cfg is not None:
-        print(12)
         wrap_fp16_model(model)
-    checkpoint = load_checkpoint(model, args.checkpoint, map_location='cpu')
-    if args.fuse_conv_bn:
-        print(34)
-        model = fuse_conv_bn(model)
+    checkpoint = load_checkpoint(model, args.weight , map_location='cpu')
+
     # old versions did not save class info in checkpoints, this walkaround is
     # for backward compatibility
     if 'CLASSES' in checkpoint['meta']:
-        print('hi3')
         model.CLASSES = checkpoint['meta']['CLASSES']
     else:
         model.CLASSES = dataset.CLASSES
 
-    if not distributed:
-        print('hi5')
-        model = MMDataParallel(model, device_ids=[0])
-        print('model check')
-        outputs = single_gpu_test(model, data_loader, args.show, args.show_dir,
-                                  args.show_score_thr)
-        print('\n',len(outputs),'\n')
-        #outputs = bbox_nms.multiclass_nms(outputs1, outputs1, score_thr=0.8, nms_cfg=0.7)
-        
+    model = MMDataParallel(model, device_ids=[0])
+    show_score_thr = 0.5
+    outputs = single_gpu_test(model, data_loader, False, args.show_dir, show_score_thr)
 
-        
-
-    else:
-        model = MMDistributedDataParallel(
-            model.cuda(),
-            device_ids=[torch.cuda.current_device()],
-            broadcast_buffers=False)
-        outputs = multi_gpu_test(model, data_loader, args.tmpdir,
-                                 args.gpu_collect)
     rank, _ = get_dist_info()
     if rank == 0:
-        if args.out:
-            print(f'\nwriting results to {args.out}')
-            mmcv.dump(outputs, args.out)
-        kwargs = {} if args.eval_options is None else args.eval_options
-        print(kwargs)
-        if args.format_only:
-            print(4)
-            dataset.format_results(outputs, **kwargs)
-        if args.eval:
-            eval_kwargs = cfg.get('evaluation', {}).copy()
-            # hard-code way to remove EvalHook args
-            for key in ['interval', 'tmpdir', 'start', 'gpu_collect']:
-                eval_kwargs.pop(key, None)
-            eval_kwargs.update(dict(metric=args.eval, **kwargs))
-            print(dataset.evaluate(outputs, **eval_kwargs))
-            
-            
-   
-    with open('/home/jaehyeop/mmdetection/result.bbox.json') as f:
+        kwargs = {'jsonfile_prefix': os.path.dirname(os.path.realpath(__file__))+'/result'}
+        dataset.format_results(outputs, **kwargs)
+
+    # json file    
+    # apply score_thr 
+    with open(os.path.dirname(os.path.realpath(__file__))+'/result.bbox.json') as f:
         pred = json.load(f)
 
     while True:
         count = 0
         for data in pred:
-            if data['score'] < args.show_score_thr:
+            if data['score'] < show_score_thr:
                 pred.remove(data)
                 count +=1
         if count ==0:
             break
-    with open('/home/jaehyeop/mmdetection/result.bbox.json', 'w') as f:
+
+    with open(os.path.dirname(os.path.realpath(__file__))+'/result.bbox.json', 'w') as f:
         json.dump(pred,f,indent='\t')
 
-
-
-
-
-    with open('result.bbox.json') as json_file:
+    # convert to submission style
+    with open(os.path.dirname(os.path.realpath(__file__))+'/result.bbox.json') as json_file:
         json_data = json.load(json_file)
+    
+    size = len(images_list)
+    check = [False for i in range(size)]
+    dic = OrderedDict({key:{'id': key+1, 'file_name': images_list[key].split('/')[-1], 'object':[{'box':[], 'label': ""}]} for key in range(size)})
 
-    f = open('submission.json', 'w')
-    FD = {}
+    f = open('./t3_res_0030.json', 'w')
     for item in json_data:
-        cur_id = item["image_id"]
-        container = {}
-        #print(item)
-        if cur_id not in FD:
-            container["id"] = cur_id
-            container["file_name"] = item["file_name"]
-            x, y, w, h = item["bbox"]
-            container["object"] = [{"box":[x, y, x+w, y+h], "label": "c" + str(item["category_id"])}]
-            FD[cur_id] = container
+        cur_id = item["image_id"] - 1
+
+        if check[cur_id] == False: # nothing 
+            x, y, w, h = [int(i) for i in item["bbox"]]
+            dic[cur_id]['object'] = [{"box":[x, y, x+w, y+h], "label": "c" + str(item["category_id"])}]
+            check[cur_id] = True
         else:
-            x, y, w, h = item["bbox"]
-            container = FD[cur_id]
-            container["object"].append({"box":[x, y, x+w, y+h], "label": "c" + str(item["category_id"])})
+            x, y, w, h = [int(i) for i in item["bbox"]]
+            dic[cur_id]["object"].append({"box":[x, y, x+w, y+h], "label": "c" + str(item["category_id"])})
 
+    dic = list(dic.values())
+    last = {"annotations":dic}
+    last = str(last).replace("'", '"')
 
-    FD = str(list(FD.values())).replace("'", '"')
-    f.write(FD)
+    f.write(last)
     f.close()
-        
+    
+    os.remove(os.path.dirname(os.path.realpath(__file__))+'/result.bbox.json')
+    
+    
 
 if __name__ == '__main__':
     main()
