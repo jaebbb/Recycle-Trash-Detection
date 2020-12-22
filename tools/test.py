@@ -127,7 +127,7 @@ def main():
     check = [False for i in range(size)]
     dic = OrderedDict({key:{'id': key+1, 'file_name': images_list[key].split('/')[-1], 'object':[{'box':[], 'label': ""}]} for key in range(size)})
 
-    f = open('./t3_res_0030.json', 'w')
+    f = open('./result.json', 'w')
     for item in json_data:
         cur_id = item["image_id"] - 1
 

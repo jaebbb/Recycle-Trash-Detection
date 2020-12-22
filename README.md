@@ -39,7 +39,7 @@ $ ./tools/dist_train.sh ${MODEL_FILE}  ${GPU_NUM}
 e.g. `python3 tools/train.py model/cascade.py`
 
 ## Inference  
-You will get json files `xxxx.json` to be submit to the official evaluation server.  
+You will get json files `result.json` to be submit to the official evaluation server.  
 You can use the following commands to get result images.  
 Detection results will be plotted on the images and saved to the specified directory.  
 ```bash
