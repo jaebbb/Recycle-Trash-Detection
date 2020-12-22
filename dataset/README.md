@@ -4,7 +4,7 @@ It is recommended to dataset root to `$Recycle-Trash-Detection/dataset`.
 If your folder structure is different, you may need to change the corresponding paths in files.
 
 ```
-NIA-Tool-Segmentation
+Recycle-Trash-Detection
 ├── dataset
 │   ├── train
 │   │   ├── imgs
