@@ -8,16 +8,20 @@ RUN apt-get update && apt-get install -y ffmpeg libsm6 libxext6 git ninja-build 
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install MMDetection
+# pytorch remove
+RUN pip uninstall torch torchvision -y 
+
+# set envrionments and install packages
 RUN conda clean --all
 RUN git clone https://github.com/jaebbb/Recycle-Trash-Detection.git /Recycle-Trash-Detection
 WORKDIR /Recycle-Trash-Detection
 ENV FORCE_CUDA="1"
 RUN pip install -r requirements.txt
 
+# for '--use-deprecated' option of installing mmcv-full 
 RUN pip install --upgrade pip
-RUN python -V
 
+# mmpycocotools, mmcv-full
 RUN pip install mmpycocotools
 RUN pip install mmcv-full==1.1.6+torch1.5.0+cu102 -f https://openmmlab.oss-accelerate.aliyuncs.com/mmcv/dist/index.html --use-deprecated=legacy-resolver
 RUN pip install -v -e .
