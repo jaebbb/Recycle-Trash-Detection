@@ -63,10 +63,13 @@ e.g. `python3 tools/test.py model/cascade.py work_dirs/cascade/latest.pth ./resu
 ## Another option : Docker  
 - We provide a Dockerfile to build an image.  
 ```bash
-now updating...
+$ sudo docker build -t ${IMAGE_NAME} docker/
 ```  
+e.g. `sudo docker build -t recycle docker/`
+
 - Run it with  
 ```
-$ docker run --gpus all --shm-size=8g -it -v {DATA_DIR}:/Recycle-Trash-Detection/dataset RTD
+$ sudo docker run --gpus all --shm-size=8g -it ${IMAGE_NAME}
 ```
+e.g. `sudo docker run --gpus all --shm-size=8g -it recycle`
 
