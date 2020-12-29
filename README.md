@@ -69,7 +69,7 @@ e.g. `sudo docker build -t recycle docker/`
 
 - Run it with  
 ```
-$ sudo docker run --gpus all --shm-size=8g -it --name ${CONTAINER_NAME} ${IMAGE_NAME}
+$ docker run --gpus all --shm-size=8g -it -v {DATA_DIR}:/Recycle-Trash-Detection/dataset --name ${CONTAINER_NAME} ${IMAGE_NAME}
 ```
-e.g. `sudo docker run --gpus all --shm-size=8g -it --name recycle recycle`
+e.g. `sudo docker run --gpus all --shm-size=8g -it -v ~/dataset/:/Recycle-Trash-Detection/dataset --name recycle_test recycle`
 
