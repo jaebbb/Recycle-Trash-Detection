@@ -27,7 +27,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='MMDet test (and eval) a model')
     parser.add_argument('model', default='./work_dirs/cascade/cascade.py')
     parser.add_argument('weight', default='work_dirs/cascade/latest.pth')
-    parser.add_argument('show-dir', help='directory where painted images will be saved')
+    parser.add_argument('show_dir', help='directory where painted images will be saved')
     args = parser.parse_args()
     if 'LOCAL_RANK' not in os.environ:
         os.environ['LOCAL_RANK'] = str(0)
